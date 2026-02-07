@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Controle LED ESP8266</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 18px; }
+    button { padding: 12px 18px; margin-right: 10px; font-size: 16px; cursor: pointer; }
+    #status { margin-top: 14px; font-weight: bold; }
+    input { padding: 10px; width: 280px; margin: 6px 0; }
+  </style>
+</head>
+<body>
+  <h2>Controle do LED (ESP8266) via HiveMQ Cloud</h2>
+
+  <p><b>Status:</b> <span id="status">desconectado</span></p>
+
+  <h3>Credenciais HiveMQ</h3>
+  <input id="user" placeholder="Usuário HiveMQ" />
+  <br />
+  <input id="pass" placeholder="Senha HiveMQ" type="password" />
+  <br />
+  <button id="btnConnect">Conectar</button>
+
+  <hr />
+
+  <button id="btnOn" disabled>LIGAR</button>
+  <button id="btnOff" disabled>DESLIGAR</button>
+
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script>
+    const WSS_URL = "wss://d989d0d1e2df4a1fb4c051b4e68f5ced.s1.eu.hivemq.cloud:8884/mqtt";
+    const TOPIC_LED = "devices/ESP001/led";
+
+    const statusEl = document.getElementById("status");
+    const btnOn = document.getElementById("btnOn");
+    const btnOff = document.getElementById("btnOff");
+    const btnConnect = document.getElementById("btnConnect");
+
+    let client = null;
+
+    function setUIConnected(isConnected) {
+      btnOn.disabled = !isConnected;
+      btnOff.disabled = !isConnected;
+    }
+
+    btnConnect.onclick = () => {
+      const username = document.getElementById("user").value.trim();
+      const password = document.getElementById("pass").value;
+
+      if (!username || !password) {
+        alert("Preencha usuário e senha do HiveMQ.");
+        return;
+      }
+
+      statusEl.textContent = "conectando...";
+
+      client = mqtt.connect(WSS_URL, {
+        username,
+        password,
+        clientId: "web_" + Math.random().toString(16).slice(2),
+        clean: true,
+        connectTimeout: 8000,
+        reconnectPeriod: 2000
+      });
+
+      client.on("connect", () => {
+        statusEl.textContent = "conectado ✅";
+        setUIConnected(true);
+      });
+
+      client.on("reconnect", () => {
+        statusEl.textContent = "reconectando...";
+        setUIConnected(false);
+      });
+
+      client.on("error", (err) => {
+        statusEl.textContent = "erro ❌ " + err.message;
+        setUIConnected(false);
+      });
+
+      client.on("close", () => {
+        statusEl.textContent = "desconectado";
+        setUIConnected(false);
+      });
+    };
+
+    btnOn.onclick = () => {
+      if (!client) return;
+      client.publish(TOPIC_LED, "ON", { qos: 0, retain: false });
+    };
+
+    btnOff.onclick = () => {
+      if (!client) return;
+      client.publish(TOPIC_LED, "OFF", { qos: 0, retain: false });
+    };
+  </script>
+</body>
+</html>
